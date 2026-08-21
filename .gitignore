@@ -1,0 +1,43 @@
+# Model weights and caches
+*.gguf
+*.safetensors
+models/
+model-cache/
+.cache/
+
+# Dependencies and generated files
+node_modules/
+__pycache__/
+*.py[cod]
+*.log
+logs/
+
+# Temporary experiments and archives
+agent-smoke/
+model-smoke/
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.docker.tar
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.auth
+auth.json
+credentials.json
+.netrc
+
+# Editors and operating systems
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db

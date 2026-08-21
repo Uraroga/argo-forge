@@ -1,0 +1,60 @@
+{
+  "models_dir": "$HOME/llama-cpp-models",
+  "models": [
+    {
+      "alias": "qwen38-q8",
+      "name": "Qwen3.8-27B Q8_0",
+      "file": "Qwen3.8-27B-Q8_0.gguf",
+      "context": 2048,
+      "runtime": "local/qwen38-27b-server-ivybridge:dev",
+      "reasoning": "off",
+      "server_args": [],
+      "status": "ready",
+      "note": "Verified end to end in an earlier coding-agent run; a later constrained timeout does not revoke that result"
+    },
+    {
+      "alias": "qwen-coder-q4",
+      "name": "Qwen3-Coder-30B-A3B Q4_K_M",
+      "file": "Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf",
+      "context": 2048,
+      "runtime": "local/qwen38-27b-server-ivybridge:dev",
+      "reasoning": "default",
+      "server_args": [],
+      "status": "ready",
+      "note": "Completed load, generation, tool use, real edit, and a green post-edit test in the normalized Ivy Bridge run"
+    },
+    {
+      "alias": "qwen35-q4",
+      "name": "Qwen3.5-35B-A3B Q4_K_M",
+      "file": "Qwen3.5-35B-A3B-Q4_K_M.gguf",
+      "context": 2048,
+      "runtime": "local/qwen38-27b-server-ivybridge:dev",
+      "reasoning": "default",
+      "server_args": [],
+      "status": "partial",
+      "note": "Loaded, generated, inspected files, ran the failing test, and fixed the bug; timed out before the post-edit test rerun"
+    },
+    {
+      "alias": "bonsai-q1",
+      "name": "Bonsai-27B Q1_0",
+      "file": "Bonsai-27B-Q1_0.gguf",
+      "context": 2048,
+      "runtime": "local/qwen38-27b-server-ivybridge:dev",
+      "reasoning": "default",
+      "server_args": [],
+      "status": "unverified",
+      "note": "Loads and generates on Ivy Bridge; native tool calling was not demonstrated within the targeted diagnostic time limits"
+    },
+    {
+      "alias": "bonsai-q2",
+      "name": "Ternary Bonsai-27B Q2_0",
+      "file": "Ternary-Bonsai-27B-Q2_0.gguf",
+      "context": 2048,
+      "runtime": "local/qwen38-27b-server-ivybridge:dev",
+      "reasoning": "default",
+      "server_args": [],
+      "status": "load-failed",
+      "note": "This exact GGUF/runtime pair failed with an unexpected output_norm.weight tensor offset; this is not a family-wide conclusion"
+    }
+  ]
+}

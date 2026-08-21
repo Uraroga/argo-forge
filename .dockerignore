@@ -1,0 +1,14 @@
+.git
+.github
+docs
+logs
+node_modules
+**/node_modules
+__pycache__
+*.py[cod]
+*.gguf
+*.safetensors
+*.tar
+*.tar.gz
+*.zip
+.env*
