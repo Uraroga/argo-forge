@@ -50,6 +50,8 @@ Preserve all of these:
 - Preserve retries for transient startup URL, timeout, connection-reset, and
   malformed early JSON responses.
 - Keep the active source repository as the OpenCode workspace.
+- Do not increase the tool schema casually. Argo Forge intentionally trades
+  tool variety for small context overhead.
 
 The compact shell tool executes as the current user and is not a security
 sandbox. Do not describe it as one.
@@ -92,6 +94,19 @@ Benchmarks are expensive on the reference host and must not be repeated without
 a concrete question. Use identical prompts/settings for comparisons, label
 single runs as exploratory, and separate load, generation, tool, edit, test,
 and complete-agent stages.
+
+## Execution budgets
+
+`localcode MODEL --ctx N --steps N --output N` configures three independent
+positive-integer budgets. Context defaults to the selected registry entry;
+agent steps default to 24; model output per turn defaults to 256. OpenCode owns
+the agent loop—do not add a second loop engine.
+
+Large contexts cost RAM and prompt-processing time. Large step budgets can
+produce hours-long CPU workloads. Keep defaults conservative and never silently
+change them to huge values. Preserve the compact prompt's guidance to inspect
+before editing, batch related shell operations, read errors, and verify with
+relevant tests before claiming completion.
 
 ## Never do these things
 

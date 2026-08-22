@@ -1,7 +1,7 @@
 import { tool } from "@opencode-ai/plugin"
 
 export default tool({
-  description: "Run one Bash command in the current project. Use it to inspect, create or edit files, compile, run tests, read errors, and continue the coding loop.",
+  description: "Run Bash in the current project. Batch related commands in one call when practical. Use grep/find/sed/cat, git diff, tests, compiler output, and normal shell syntax to inspect, edit, and verify work; avoid spending separate steps on trivial echo commands.",
   args: {
     command: tool.schema.string().describe("Bash command to run in the project"),
   },
@@ -16,6 +16,6 @@ export default tool({
       new Response(process.stderr).text(),
       process.exited,
     ])
-    return `${stdout}${stderr}exit=${exitCode}`
+    return `stdout:\n${stdout}\nstderr:\n${stderr}\nexit=${exitCode}`
   },
 })

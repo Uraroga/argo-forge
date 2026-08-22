@@ -46,7 +46,8 @@ system prompts can consume a large fraction of a 2048-token context before a
 model sees the actual task. On a very old CPU, prompt processing can also take
 longer than generation. Argo Forge therefore disables the default toolset and
 offers one small project-scoped shell tool for inspection, edits, builds, and
-tests.
+tests. The agent is encouraged to batch related inspections and shell commands
+so it receives useful textual observations without wasting agent steps.
 
 ## Reference hardware
 
@@ -78,6 +79,7 @@ modern CPUs, and GPUs were not validated for this release.
 - Current-directory OpenCode workspace preservation
 - Isolated local provider configuration with cloud providers disabled
 - One compact local coding tool
+- Configurable context, per-turn output, and agent-step budgets
 - Status, stop, server-only, and dry-run commands
 
 ## Quick start
@@ -92,6 +94,36 @@ localcode qwen38-q8       # start the Qwen3.8 baseline
 localcode --status
 localcode --stop
 ```
+
+## Agent budgets
+
+LocalCode exposes three separate controls while OpenCode continues to own the
+agent loop:
+
+- `--ctx N` controls how much context the model can work with. More context
+  costs RAM and prompt-processing time.
+- `--output N` controls the maximum model output allowance for one turn. The
+  default is 256 tokens.
+- `--steps N` controls how many agentic work iterations OpenCode may perform.
+  The default is 24.
+
+All accept positive integers. These are guidance, not universal optimum values:
+
+```bash
+# Small bug fix
+localcode qwen-coder-q4 --ctx 4096 --steps 24
+
+# Small application or iterative coding
+localcode qwen-coder-q4 --ctx 8192 --steps 48
+
+# Larger autonomous task
+localcode qwen-coder-q4 --ctx 16384 --steps 100 --output 1024
+```
+
+Large contexts increase RAM use and prompt-processing time. Large step budgets
+can mean hours of autonomous work on slow CPUs. Start with a moderate step
+budget. Increase it when the agent reaches `MAXIMUM STEPS REACHED` while it is
+still making useful progress.
 
 Use `--dry-run` to validate a model entry and inspect the Docker command
 without loading the model:

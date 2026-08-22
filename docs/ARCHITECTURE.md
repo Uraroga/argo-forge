@@ -32,9 +32,9 @@ the current working repository
 
 `localcode.py` reads `models.json`, validates the selected alias and GGUF,
 constructs the Docker command, and manages a container named
-`localcode-llama-server`. Labels record ownership, model alias, context, and
-runtime. LocalCode refuses to remove an identically named container without
-its ownership label.
+`localcode-llama-server`. Labels record ownership, model alias, context,
+runtime, step budget, and output budget. LocalCode refuses to remove an
+identically named container without its ownership label.
 
 Only one model is loaded because the reference host has limited memory and
 because deterministic model switching is easier to reason about than multiple
@@ -68,6 +68,12 @@ endpoint, disables all cloud providers and default plugins, and points
 The current shell directory is passed to OpenCode as the workspace. Argo Forge
 does not add `.opencode` files to repositories visited by the user.
 
+OpenCode remains the only agent-loop engine. LocalCode merely configures its
+maximum step count: `--steps` is the number of agentic iterations, `--output`
+is the model allowance for one turn, and `--ctx` is the available context.
+These limits are independent; reaching the step ceiling does not establish
+that the context was exhausted.
+
 ## Why one compact tool
 
 OpenCode's broad default toolset is useful with large cloud contexts but its
@@ -80,6 +86,11 @@ Argo Forge disables every default tool and exposes one compact `shell` tool
 with one string argument. It runs Bash in the active workspace and returns
 stdout, stderr, and the exit code. This gives the model enough capability to
 inspect, edit, compile, and test while keeping the schema small.
+
+The tool labels those three result sections explicitly and encourages batching
+related shell operations. Commands such as `grep`, `find`, `sed`, `cat`,
+`git diff`, compilers, and tests supply the text-only model's observations
+without adding a broad tool schema or vision infrastructure.
 
 This is an engineering tradeoff, not a sandbox boundary. The tool executes as
 the current user. Run untrusted models and tasks only in an appropriately

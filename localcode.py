@@ -20,10 +20,23 @@ CONTAINER = "localcode-llama-server"
 MANAGED_LABEL = "localcode.managed=true"
 LOG = ROOT / "logs" / "localcode.log"
 BASE_URL = "http://127.0.0.1:8080"
+DEFAULT_STEPS = 24
+DEFAULT_OUTPUT = 256
+CPU_THREADS = 2
 
 
 class LocalCodeError(Exception):
     pass
+
+
+def positive_integer(value):
+    try:
+        number = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be a positive integer") from exc
+    if number <= 0:
+        raise argparse.ArgumentTypeError("must be a positive integer")
+    return number
 
 
 def load_registry():
@@ -43,11 +56,26 @@ def parser():
         prog="localcode",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description="Argo Forge — CPU-only local coding agents with interchangeable models",
-        epilog="""Examples:
+        epilog=f"""Execution budgets:
+  Context (--ctx)    How much information the model can keep available.
+                     Larger values cost more RAM and prompt-processing time.
+  Steps (--steps)    Maximum agent actions OpenCode can perform before stopping.
+  Output (--output)  Maximum model output allowance for one turn.
+
+Guidance (not universal optimum values):
+  Small bug fix:                  --ctx 4096 or 8192 --steps 24
+  Small application / iteration: --ctx 8192 --steps 48
+  Larger autonomous task:        --ctx 8192 or 16384 --steps 100
+
+Start with a moderate step budget. Increase it when the agent reaches
+MAXIMUM STEPS REACHED while it is still making useful progress. Many steps can
+mean hours of autonomous work on an old CPU.
+
+Examples:
   localcode                         interactive model selector
   localcode --list                  list models and status
-  localcode qwen38-q8               server + OpenCode
-  localcode qwen-coder-q4 --ctx 2048
+  localcode qwen-coder-q4           server + OpenCode
+  localcode qwen-coder-q4 --ctx 8192 --steps 48 --output 1024
   localcode bonsai-q1 --ctx 4096 --dry-run
   localcode qwen38-q8 --server-only
   localcode --status
@@ -59,7 +87,12 @@ GGUF files are read from the models_dir configured in models.json and inference
 runs locally on the CPU. No cloud LLM provider is enabled.""",
     )
     p.add_argument("model", nargs="?", help="model alias (see --list)")
-    p.add_argument("--ctx", type=int, metavar="N", help="context window (registry default: 2048)")
+    p.add_argument("--ctx", type=positive_integer, metavar="N",
+                   help="context window (default: selected model's registry value)")
+    p.add_argument("--steps", type=positive_integer, metavar="N",
+                   help=f"maximum OpenCode agent steps (default: {DEFAULT_STEPS})")
+    p.add_argument("--output", type=positive_integer, metavar="N",
+                   help=f"maximum model output tokens per turn (default: {DEFAULT_OUTPUT})")
     p.add_argument("--list", action="store_true", help="list models, status, and default context")
     p.add_argument("--dry-run", action="store_true", help="validate and print commands without starting anything")
     p.add_argument("--server-only", action="store_true", help="start llama-server without OpenCode")
@@ -101,9 +134,23 @@ def show_status():
     if not is_managed():
         print(f"LocalCode server: unavailable (name {CONTAINER} is used by an unmanaged container)")
         return
-    alias = docker_inspect('{{ index .Config.Labels "localcode.model" }}') or "?"
-    ctx = docker_inspect('{{ index .Config.Labels "localcode.context" }}') or "?"
-    print(f"LocalCode server: {state}; model={alias}; ctx={ctx}; endpoint={BASE_URL}/v1")
+    alias = docker_inspect('{{ index .Config.Labels "localcode.model" }}') or "unknown"
+    ctx = docker_inspect('{{ index .Config.Labels "localcode.context" }}') or "unknown"
+    steps = docker_inspect('{{ index .Config.Labels "localcode.steps" }}') or "unknown"
+    output = docker_inspect('{{ index .Config.Labels "localcode.output" }}') or "unknown"
+    print(f"LocalCode server: {state}; model={alias}; context={ctx}; steps={steps}; "
+          f"output={output}; endpoint={BASE_URL}/v1")
+
+
+def prompt_budget(label, default):
+    try:
+        raw = input(f"{label} [{default}]: ").strip()
+        value = int(raw) if raw else default
+    except (EOFError, ValueError) as exc:
+        raise LocalCodeError(f"Invalid {label.lower()}: enter a positive integer.") from exc
+    if value <= 0:
+        raise LocalCodeError(f"Invalid {label.lower()}: enter a positive integer.")
+    return value
 
 
 def choose_interactive(models):
@@ -116,28 +163,29 @@ def choose_interactive(models):
         model = models[index - 1]
     except (ValueError, IndexError, EOFError):
         raise LocalCodeError("Invalid model selection.")
-    try:
-        raw_ctx = input(f"Context [{model['context']}]: ").strip()
-        ctx = int(raw_ctx) if raw_ctx else model["context"]
-    except (EOFError, ValueError) as exc:
-        raise LocalCodeError("Invalid context: enter a positive integer.") from exc
-    return model, ctx
+    ctx = prompt_budget("Context", model["context"])
+    steps = prompt_budget("Agent steps", DEFAULT_STEPS)
+    output = prompt_budget("Output tokens", DEFAULT_OUTPUT)
+    return model, ctx, steps, output
 
 
-def server_command(model, model_path, ctx):
+def server_command(model, model_path, ctx, steps, output):
     mounted = f"/models/{model_path.name}"
     cmd = [
         "docker", "run", "-d", "--init", "--name", CONTAINER,
         "--label", MANAGED_LABEL,
         "--label", f"localcode.model={model['alias']}",
         "--label", f"localcode.context={ctx}",
+        "--label", f"localcode.steps={steps}",
+        "--label", f"localcode.output={output}",
         "--label", f"localcode.runtime={model['runtime']}",
         "--log-opt", "max-size=10m", "--log-opt", "max-file=2",
         "-p", "127.0.0.1:8080:8080",
         "-v", f"{model_path}:{mounted}:ro",
         model["runtime"],
         "--model", mounted, "--host", "0.0.0.0", "--port", "8080",
-        "--ctx-size", str(ctx), "--threads", "2", "--threads-batch", "2",
+        "--ctx-size", str(ctx), "--threads", str(CPU_THREADS),
+        "--threads-batch", str(CPU_THREADS),
         "--n-gpu-layers", "0", "--load-mode", "mmap",
     ]
     if model.get("reasoning") == "off":
@@ -176,7 +224,7 @@ def actual_model_id():
         raise LocalCodeError(f"Could not get the model ID from /v1/models: {exc}") from exc
 
 
-def opencode_config(model, model_id, ctx):
+def opencode_config(model, model_id, ctx, steps, output):
     return {
         "$schema": "https://opencode.ai/config.json",
         "model": f"llama.cpp/{model_id}",
@@ -187,14 +235,14 @@ def opencode_config(model, model_id, ctx):
             "npm": "@ai-sdk/openai-compatible",
             "name": f"llama-server {model['name']} local",
             "options": {"baseURL": f"{BASE_URL}/v1", "headerTimeout": False, "timeout": False},
-            "models": {model_id: {"name": model["name"], "limit": {"context": ctx, "output": 256}}},
+            "models": {model_id: {"name": model["name"], "limit": {"context": ctx, "output": output}}},
         }},
         "agent": {
             "local-build": {
                 "description": "Compact local coding agent using one project shell tool",
                 "mode": "primary",
-                "prompt": "Use shell to inspect, edit, compile, and test the current project. Read errors and continue until the task is complete. Be concise.",
-                "steps": 8,
+                "prompt": "Inspect relevant files before editing. Minimize tool calls by combining related inspections and shell operations; create files with one heredoc or equivalent, not many echo calls. Read compiler and test errors, continue after failures, and inspect important edits or git diff when useful. Rerun relevant tests, verify requested output files exist, and never claim completion before requested verification succeeds. Be concise.",
+                "steps": steps,
                 "tools": {"*": False, "shell": True},
                 "permission": {"*": "deny", "shell": "allow"},
             },
@@ -231,22 +279,25 @@ def main():
             raise LocalCodeError(f"Unknown model: {args.model}. Use 'localcode --list'.")
         model = by_alias[args.model]
         ctx = args.ctx if args.ctx is not None else model["context"]
+        steps = args.steps if args.steps is not None else DEFAULT_STEPS
+        output = args.output if args.output is not None else DEFAULT_OUTPUT
     else:
-        if args.dry_run or args.server_only or args.ctx is not None:
+        budgets_given = any(value is not None for value in
+                            (args.ctx, args.steps, args.output))
+        if args.dry_run or args.server_only or budgets_given:
             raise LocalCodeError("Specify MODEL or run 'localcode' without options for the menu.")
-        model, ctx = choose_interactive(models)
-    if ctx <= 0:
-        raise LocalCodeError("--ctx must be a positive integer.")
+        model, ctx, steps, output = choose_interactive(models)
     model_path = Path(os.path.expandvars(data["models_dir"])).expanduser() / model["file"]
     if not model_path.is_file() or not os.access(model_path, os.R_OK):
         raise LocalCodeError(f"GGUF does not exist or is unreadable: {model_path}")
-    cmd = server_command(model, model_path, ctx)
-    print(f"Model: {model['name']} ({model['status']})")
-    print(f"GGUF: {model_path}\nContext: {ctx}\nRuntime: {model['runtime']}")
+    cmd = server_command(model, model_path, ctx, steps, output)
+    print(f"Model: {model['name']} ({model['alias']}, {model['status']})")
+    print(f"Context: {ctx}\nAgent steps: {steps}\nOutput tokens: {output}")
+    print(f"CPU threads: {CPU_THREADS}\nRuntime: {model['runtime']}")
+    print(f"Workspace: {Path.cwd()}\nGGUF: {model_path}")
     print("llama-server:", shlex.join(cmd))
     if args.dry_run:
         print("Model ID: <discovered from /v1/models after /health>")
-        print(f"OpenCode workspace: {Path.cwd()}")
         return 0
     if not OPENCODE.is_file():
         raise LocalCodeError(f"OpenCode not found: {OPENCODE}")
@@ -256,6 +307,8 @@ def main():
     same = (current and is_managed()
             and docker_inspect('{{ index .Config.Labels "localcode.model" }}') == model["alias"]
             and docker_inspect('{{ index .Config.Labels "localcode.context" }}') == str(ctx)
+            and docker_inspect('{{ index .Config.Labels "localcode.steps" }}') == str(steps)
+            and docker_inspect('{{ index .Config.Labels "localcode.output" }}') == str(output)
             and docker_inspect('{{ index .Config.Labels "localcode.runtime" }}') == model["runtime"])
     if not same:
         stop_server(quiet=True)
@@ -265,12 +318,14 @@ def main():
         wait_for_server()
         model_id = actual_model_id()
     except LocalCodeError as exc:
-        append_log([f"model={model['alias']}", f"gguf={model_path}", f"ctx={ctx}",
+        append_log([f"model={model['alias']}", f"gguf={model_path}",
+                    f"ctx={ctx}", f"steps={steps}", f"output={output}",
                     f"runtime={model['runtime']}", f"command={shlex.join(cmd)}", f"error={exc}"])
         raise
-    config = opencode_config(model, model_id, ctx)
+    config = opencode_config(model, model_id, ctx, steps, output)
     config_json = json.dumps(config, separators=(",", ":"))
-    append_log([f"model={model['alias']}", f"gguf={model_path}", f"ctx={ctx}",
+    append_log([f"model={model['alias']}", f"gguf={model_path}",
+                f"ctx={ctx}", f"steps={steps}", f"output={output}",
                 f"runtime={model['runtime']}", f"command={shlex.join(cmd)}", f"model_id={model_id}"])
     print(f"Model ID: {model_id}")
     if args.server_only:

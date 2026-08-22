@@ -65,6 +65,28 @@ compact shell tool and disables the default toolset for this reason.
 Do not casually add tools or long system prompts. Measure the context cost and
 keep model limits in sync with `models.json`.
 
+## MAXIMUM STEPS REACHED
+
+This message means OpenCode reached the configured operational step budget. It
+does not necessarily mean the context is exhausted, the model failed, or the
+model lost its ability to reason. A model may still be inspecting, fixing, or
+testing useful work when the ceiling is reached.
+
+If the agent was making useful progress, retry with a larger positive value:
+
+```bash
+localcode qwen-coder-q4 --ctx 8192 --steps 48
+```
+
+Start moderately and increase the budget deliberately. On an old CPU, 100 or
+more steps may run for hours. Efficient use matters too: the one compact shell
+tool can combine related inspections, edits, and checks in one call instead of
+using an agent step for every trivial command.
+
+Remember that the budgets are distinct: `--ctx` is working context,
+`--output` is the maximum model output allowance per turn, and `--steps` is the
+maximum number of agentic work iterations.
+
 ## OpenCode or tool dependencies are missing
 
 The default OpenCode binary path is `$HOME/.opencode/bin/opencode`. Override it

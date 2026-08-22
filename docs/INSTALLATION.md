@@ -136,6 +136,12 @@ localcode qwen-coder-q4 --dry-run
 ```
 
 The dry run checks the registry and GGUF path but does not load a model.
+It also reports the context, agent steps, output allowance, runtime, workspace,
+and complete Docker command. For example:
+
+```bash
+localcode qwen-coder-q4 --ctx 8192 --steps 48 --output 1024 --dry-run
+```
 
 ## 7. First real launch
 
@@ -158,3 +164,9 @@ localcode --stop
 
 Only the container named `localcode-llama-server` with the ownership label
 `localcode.managed=true` is removed by `--stop`.
+
+Direct launches use the selected model's registry context plus conservative
+defaults of 24 OpenCode agent steps and 256 output tokens per model turn. The
+interactive selector prompts for all three budgets; pressing Enter keeps each
+displayed default. Larger contexts consume more RAM and prompt-processing
+time, while large step budgets can keep a slow CPU busy for hours.
