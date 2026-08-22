@@ -38,10 +38,9 @@ GGUF metadata, quantization packing, tensor layout, and architecture support
 depend on the exact llama.cpp version. A valid model family does not guarantee
 that every GGUF packing works with every runtime.
 
-Check the exact filename and runtime, then inspect logs. Keep the conclusion
-scoped to that pair. The first-release Ternary Bonsai Q2_0 file, for example,
-failed on an unexpected tensor offset; this is not evidence that all Ternary
-Bonsai files are invalid.
+Check the exact filename and runtime, then inspect logs. Keep any conclusion
+scoped to that exact GGUF/runtime pair rather than generalizing to a model
+family or another packing.
 
 Do not rebuild, convert, or redownload models automatically during routine
 diagnosis.

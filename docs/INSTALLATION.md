@@ -8,12 +8,12 @@ portable home-relative paths; choose a different project directory if needed.
 - Ubuntu 24.04 LTS
 - Python 3.12 from Ubuntu
 - Docker Engine
-- OpenCode 1.18.20 for the verified agent runs
+- OpenCode 1.18.21 for Agent Benchmark v2
 - `@opencode-ai/plugin` 1.18.20, pinned by `opencode-local/package-lock.json`
 - llama.cpp commit `bb4caa7540188872173c44d161602d9271386413`
 - Intel Core i3-3240, AVX/F16C, without AVX2/FMA
 
-OpenCode may have newer releases. Version 1.18.20 is the tested reference, not
+OpenCode may have newer releases. Version 1.18.21 is the tested reference, not
 a claim that later versions are incompatible.
 
 ## 1. Prerequisites
@@ -64,18 +64,18 @@ compiler baseline deliberately avoids instructions unavailable on Ivy Bridge:
 - AVX2, FMA, BMI/BMI2, AVX-512, AMX, and GPU backends disabled
 - compiler flags include `-march=ivybridge`, `-mno-avx2`, and `-mno-fma`
 
-Build the historical runtime tag used by the registry:
+Build the runtime tag used by the registry:
 
 ```bash
-docker build -t local/qwen38-27b-server-ivybridge:dev .
+docker build -t local/argo-forge-llama-server-ivybridge:dev .
 ```
 
-Despite the historical tag, the image contains a generic pinned
-`llama-server` and is used by all current registry entries. To verify build
+The image contains a generic pinned `llama-server` and is used by all current
+registry entries. To verify build
 metadata without loading a model:
 
 ```bash
-docker run --rm --entrypoint sh local/qwen38-27b-server-ivybridge:dev \
+docker run --rm --entrypoint sh local/argo-forge-llama-server-ivybridge:dev \
   -c 'cat /usr/local/share/llama-build-info.txt'
 ```
 

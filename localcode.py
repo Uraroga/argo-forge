@@ -76,8 +76,8 @@ Examples:
   localcode --list                  list models and status
   localcode qwen-coder-q4           server + OpenCode
   localcode qwen-coder-q4 --ctx 8192 --steps 48 --output 1024
-  localcode bonsai-q1 --ctx 4096 --dry-run
-  localcode qwen38-q8 --server-only
+  localcode qwen35-q4 --ctx 4096 --dry-run
+  localcode qwen35-q4 --server-only
   localcode --status
   localcode --stop
 

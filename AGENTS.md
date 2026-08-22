@@ -32,7 +32,7 @@ directory as the workspace.
   dependency. Never commit `node_modules`.
 - `opencode-local/tools/shell.ts`: the only enabled coding tool.
 - `README.md` and `docs/`: public architecture, installation, model evidence,
-  benchmark caveats, diagnostics, and troubleshooting.
+  benchmark methodology, caveats, and troubleshooting.
 
 ## Safety invariants
 

@@ -1,100 +1,69 @@
 # Models and registry
 
-`models.json` is the only file normally required to add or change a model.
-`localcode.py` contains no model-specific alias table.
+Argo Forge remains an interchangeable-model architecture. `models.json`
+contains the currently public verified configurations; `localcode.py` has no
+model-specific alias table.
+
+GGUF weights stay outside the repository in `models_dir`. Environment variables
+and `~` are expanded; the public default is `$HOME/llama-cpp-models`.
 
 ## Registry fields
-
-The root `models_dir` is the directory containing weights. Environment
-variables and `~` are expanded. The public default is
-`$HOME/llama-cpp-models`.
-
-Each entry has these fields:
 
 | Field | Meaning |
 | --- | --- |
 | `alias` | Stable command-line name used as `localcode ALIAS` |
 | `name` | Human-readable display name |
 | `file` | GGUF filename relative to `models_dir` |
-| `context` | Default context window; 2048 for the first release |
+| `context` | Default context window |
 | `runtime` | Docker image containing the compatible llama-server |
-| `reasoning` | `off` adds `--reasoning off`; other values preserve runtime defaults |
-| `server_args` | Additional llama-server arguments appended verbatim |
-| `status` | Evidence level described below |
-| `note` | Scoped explanation of what was observed |
+| `reasoning` | `off` disables runtime reasoning; other values preserve defaults |
+| `server_args` | Extra llama-server arguments appended verbatim |
+| `status` | Evidence status |
+| `note` | Concise description of verified evidence |
 
-## Status semantics
+## Ready criterion
 
-### `ready`
-
-Verified through a useful complete coding-agent workflow:
+A model is `ready` only after this complete evidence chain succeeds:
 
 ```text
-load → health → generation → OpenCode → tool call → real edit
-     → post-edit test execution → green PASS
+load → health → generation → OpenCode → meaningful tool use
+     → project inspection → real edit → post-edit test → green PASS
 ```
 
-### `partial`
+Loading, text generation, a syntactic tool call, or a correct-looking edit
+without an executed green post-edit test is insufficient.
 
-Important functionality was observed, but the complete coding loop was not
-demonstrated. The note must state exactly where the run stopped.
+## Public verified models
 
-### `unverified`
+### `qwen-coder-q4`
 
-The file may load or generate, but the required complete behavior has not been
-demonstrated. This is not a statement about model quality.
+Qwen3-Coder-30B-A3B Q4_K_M completed the full Agent Benchmark v2 workflow and
+executed `TEST PASS`. It produced the fastest successful agent run in this
+single exploratory comparison.
 
-### `load-failed`
+### `qwen35-q4`
 
-The exact tested GGUF/runtime pair failed before inference. This does not mean
-that the model family, another packing, or a newer runtime is universally
-incompatible.
+Qwen3.5-35B-A3B Q4_K_M completed the full Agent Benchmark v2 workflow and
+executed `TEST PASS`. It used less measured container memory than
+`qwen-coder-q4` in this run.
 
-## First-release registry
+Both entries are `ready`. See [Agent Benchmark v2](BENCHMARKS.md) for the fixed
+protocol, measurements, and caveats.
 
-### `qwen-coder-q4` — `ready`
+## Adding another local model
 
-Qwen3-Coder-30B-A3B Q4_K_M completed the normalized Ivy Bridge workflow: load,
-generation, project inspection, real edit, and a green post-edit Python test.
+The public verified set is not a claim that other models cannot work. Users can
+add compatible GGUF configurations themselves:
 
-### `qwen38-q8` — `ready`
+1. Obtain a GGUF from its publisher and review its license.
+2. Store it outside this repository in `models_dir`.
+3. Add one clean entry to `models.json`; do not change `localcode.py`.
+4. Run `localcode ALIAS --dry-run` and inspect the image, read-only mount,
+   localhost port, CPU flags, context, and budgets.
+5. Test load, `/health`, `/v1/models`, and a small direct generation.
+6. Keep the entry below `ready` until a real OpenCode edit followed by an
+   executed green post-edit test succeeds.
+7. Record only the evidence actually demonstrated.
 
-Qwen3.8-27B Q8_0 completed an earlier end-to-end coding verification. A later
-300-second normalized comparison did not reach a tool call, but one constrained
-timeout does not erase the earlier successful evidence.
-
-### `qwen35-q4` — `partial`
-
-Qwen3.5-35B-A3B Q4_K_M loaded, generated, called tools, inspected the project,
-ran the failing test, and correctly fixed the bug. It timed out before rerunning
-the test after the edit, so it is not `ready`.
-
-### `bonsai-q1` — `unverified`
-
-Bonsai-27B Q1_0 loads and generates with very low observed RSS. The official
-tool-aware Jinja path and reasoning budgets 64, 32, and 0 were tested, but no
-complete native `tool_calls` response was returned within the targeted
-240-second limits. This does not establish that Bonsai cannot call tools on
-other hardware or configurations.
-
-### `bonsai-q2` — `load-failed`
-
-The exact file `Ternary-Bonsai-27B-Q2_0.gguf` failed with an unexpected
-`output_norm.weight` tensor offset and unreadable GGUF tensor data in the pinned
-runtime. No conclusion is drawn about other Ternary Bonsai variants.
-
-The separate Q2_g64 variant is not part of this release.
-
-## Adding a model
-
-1. Obtain the GGUF directly from its publisher and review its license.
-2. Store it outside the repository in `models_dir`.
-3. Add one entry to `models.json`; do not create aliases for every experiment.
-4. Run `localcode ALIAS --dry-run` and inspect the image, mount, port, and args.
-5. Test load, `/health`, `/v1/models`, and one short generation.
-6. Keep status `unverified` until the complete OpenCode edit-and-green-test
-   workflow succeeds.
-7. Document model-specific flags and evidence in `note` and public docs.
-
-Never commit model weights. A filename in the registry is metadata, not a
-redistribution of the model.
+Never commit model weights. A registry filename is metadata, not model
+redistribution.
