@@ -41,14 +41,17 @@ code observations, and encourages batching related commands.
 ## Reference system
 
 - Intel Core i3-3240 at 3.40 GHz (Ivy Bridge, 2012)
+- HP Elite 8300 SFF reference host
 - 2 physical cores / 4 threads
 - 32 GB DDR3
 - AVX and F16C; no AVX2 or FMA
 - CPU-only
 - Ubuntu 24.04 LTS
 
-The Dockerfile pins llama.cpp and deliberately targets Ivy Bridge without
-AVX2/FMA assumptions. This is tested hardware, not a universal minimum.
+The Dockerfile pins llama.cpp and compiles release code with `-O3` and
+`-march=ivybridge`: AVX and F16C are enabled; AVX2, FMA, BMI/BMI2, AVX-512,
+AMX, CUDA, Vulkan, and OpenCL are disabled. This is tested hardware, not a
+universal minimum.
 
 ## Features
 
@@ -66,7 +69,7 @@ AVX2/FMA assumptions. This is tested hardware, not a universal minimum.
 
 ```bash
 localcode                 # interactive model and budget selection
-localcode --list          # verified aliases and default context
+localcode --list          # registered aliases, status, and default context
 localcode qwen-coder-q4
 localcode qwen35-q4
 localcode --status
@@ -106,10 +109,10 @@ starting Docker or loading a model:
 localcode qwen-coder-q4 --ctx 8192 --steps 48 --output 1024 --dry-run
 ```
 
-## Currently verified models
+## Verified and experimental models
 
-The public registry contains only configurations that completed the full Argo
-Forge workflow on the reference system:
+Two public registry entries completed the full Argo Forge workflow on the
+reference system:
 
 | Alias | Model | Status |
 | --- | --- | --- |
@@ -120,6 +123,27 @@ Forge workflow on the reference system:
 use, project inspection, a real edit, and an executed green post-edit test.
 The architecture remains model-interchangeable: users may add other compatible
 local GGUF configurations through `models.json` and verify them independently.
+
+The registry also contains `partial` local-integration entries used for
+OpenClaw AMS experiments. They record reproducible filenames and launch
+settings but have **not** completed Argo Forge's full edit-and-test criterion.
+`localcode --list` shows the status of every entry; presence in the registry is
+not a performance or readiness endorsement.
+
+## OpenClaw AMS CPU-inference integration
+
+The experimental `qwen3-14b-q2` entry serves Qwen3 14B Q2_K with context
+16,384, two generation threads, two batch threads, mmap, reasoning off, one
+slot, logical batch 256, and physical batch 128. OpenClaw AMS measured the
+batch choice directly on the reference Ivy Bridge host: prompt-throughput
+differences across tested batches were sub-percent and treated as noise, while
+256/128 reduced cancel-to-release by 87.462% against a historical 2048/512
+observation.
+
+That result is specific to one GGUF, pinned llama.cpp build, prompt, and host;
+it is not a universal batch recommendation. Argo Forge still binds the managed
+endpoint only to `127.0.0.1:8080`. See the
+[OpenClaw AMS evidence](https://github.com/Uraroga/openclaw-ams/blob/main/docs/local-model-integration.md).
 
 ## Agent Benchmark v2
 
@@ -161,6 +185,9 @@ See [Installation](docs/INSTALLATION.md) for exact commands.
 The current setup is text-only and cannot visually inspect a graphical
 application. Measurements on the reference host are exploratory and should not
 be extrapolated to other CPUs, GPUs, runtimes, prompts, or GGUF packings.
+Local inference on two old CPU cores is slow, and full agent runs may take many
+minutes or hours. The compact shell tool executes as the current user; it is an
+overhead reduction, not a security sandbox.
 
 ## License
 

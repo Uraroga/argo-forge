@@ -50,6 +50,38 @@ executed `TEST PASS`. It used less measured container memory than
 Both entries are `ready`. See [Agent Benchmark v2](BENCHMARKS.md) for the fixed
 protocol, measurements, and caveats.
 
+## Public verified versus local experimental entries
+
+Only `qwen-coder-q4` and `qwen35-q4` are currently `ready`. The other registry
+entries are retained as `partial` records of local OpenClaw integration work:
+
+| Alias | Purpose / evidence boundary |
+| --- | --- |
+| `qwen3-4b-q4` | Load, health, discovery, short generation, and OpenClaw request-start evidence |
+| `qwen3-8b-q4` | Standalone OpenClaw integration; no full Argo Forge workflow |
+| `qwen38-27b-q4` | Experimental human-evaluation setup |
+| `qwen35-9b-q4` | Experimental OpenClaw integration |
+| `qwen3-14b-q3` | Infrastructure and minimal transport validation |
+| `qwen3-14b-q2` | Current OpenClaw AMS CPU-only integration and batch validation |
+
+These entries use portable model filenames, contain no weights, and do not
+claim that every user should obtain or run those models. Availability,
+licensing, packing compatibility, and performance must be reviewed separately.
+
+The `qwen3-14b-q2` entry remains `partial`; Goal 5L did not run the complete
+ready criterion. Its `server_args` deliberately set logical
+`--batch-size 256` and physical `--ubatch-size 128`. A controlled OpenClaw AMS
+Goal 5K sweep on the reference Ivy Bridge host found this pair preserved prompt
+throughput while materially improving cancellation responsiveness compared
+with llama.cpp's 2048/512 defaults. Goal 5L subsequently verified that the
+normal managed container receives both flags, loads the configured Q2_K model,
+answers a small direct request, stays bound to host loopback, and is reachable
+through the expected SSH transport path.
+
+These values are specific to this model, pinned runtime, host, and integration
+evidence. They are not Argo Forge-wide defaults and should not be copied to
+other registry entries without measurement.
+
 ## Adding another local model
 
 The public verified set is not a claim that other models cannot work. Users can
