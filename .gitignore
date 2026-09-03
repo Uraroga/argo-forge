@@ -15,6 +15,7 @@ logs/
 # Temporary experiments and archives
 agent-smoke/
 model-smoke/
+models.json.before-*
 *.tar
 *.tar.gz
 *.tgz

@@ -2,6 +2,39 @@
   "models_dir": "$HOME/llama-cpp-models",
   "models": [
     {
+      "alias": "qwen3-4b-q4",
+      "name": "Qwen3-4B Q4_K_M",
+      "file": "Qwen3-4B-Q4_K_M.gguf",
+      "context": 2048,
+      "runtime": "local/argo-forge-llama-server-ivybridge:dev",
+      "reasoning": "default",
+      "server_args": [],
+      "status": "partial",
+      "note": "Goal 5C passed load, health, model discovery, measured generation, and OpenClaw request start; no full Argo Forge edit-and-test workflow"
+    },
+    {
+      "alias": "qwen3-8b-q4",
+      "name": "Qwen3-8B Q4_K_M",
+      "file": "qwen3-8b-q4_k_m.gguf",
+      "context": 16384,
+      "runtime": "local/argo-forge-llama-server-ivybridge:dev",
+      "reasoning": "off",
+      "server_args": [],
+      "status": "partial",
+      "note": "Experimental standalone Argo3 model for OpenClaw Goal 5D; full Argo Forge validation not completed"
+    },
+    {
+      "alias": "qwen38-27b-q4",
+      "name": "Qwen3.8-27B-Uncensored Q4_K_M",
+      "file": "Qwen3.8-27B-Uncensored-Q4_K_M.gguf",
+      "context": 16384,
+      "runtime": "local/argo-forge-llama-server-ivybridge:dev",
+      "reasoning": "off",
+      "server_args": [],
+      "status": "partial",
+      "note": "Experimental standalone Argo3 model prepared for human OpenClaw evaluation in Goal 5E"
+    },
+    {
       "alias": "qwen-coder-q4",
       "name": "Qwen3-Coder-30B-A3B Q4_K_M",
       "file": "Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf",
@@ -22,6 +55,49 @@
       "server_args": [],
       "status": "ready",
       "note": "Completed the full agentic workflow with TEST PASS and used less measured memory than qwen-coder-q4 in Agent Benchmark v2"
+    },
+    {
+      "alias": "qwen35-9b-q4",
+      "name": "Qwen3.5-9B UD-Q4_K_XL",
+      "file": "Qwen3.5-9B-UD-Q4_K_XL.gguf",
+      "context": 16384,
+      "runtime": "local/argo-forge-llama-server-ivybridge:dev",
+      "reasoning": "default",
+      "server_args": [],
+      "status": "partial",
+      "note": "Experimental Argo3 standalone model for OpenClaw testing"
+    },
+    {
+      "alias": "qwen3-14b-q3",
+      "name": "Qwen3 14B Q3_K_M",
+      "file": "Qwen_Qwen3-14B-Q3_K_M.gguf",
+      "context": 16384,
+      "runtime": "local/argo-forge-llama-server-ivybridge:dev",
+      "reasoning": "off",
+      "server_args": [
+        "--parallel",
+        "1"
+      ],
+      "status": "partial",
+      "note": "Experimental standalone Argo3 model for OpenClaw Goal 5F; infrastructure and minimal transport validation only, pending human quality evaluation"
+    },
+    {
+      "alias": "qwen3-14b-q2",
+      "name": "Qwen3 14B Q2_K",
+      "file": "Qwen_Qwen3-14B-Q2_K.gguf",
+      "context": 16384,
+      "runtime": "local/argo-forge-llama-server-ivybridge:dev",
+      "reasoning": "off",
+      "server_args": [
+        "--parallel",
+        "1",
+        "--batch-size",
+        "256",
+        "--ubatch-size",
+        "128"
+      ],
+      "status": "partial",
+      "note": "Experimental standalone Argo3 model for OpenClaw Goal 5G; clean infrastructure and transport validation only, pending first human quality evaluation"
     }
   ]
 }
