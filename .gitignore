@@ -42,3 +42,5 @@ credentials.json
 *~
 .DS_Store
 Thumbs.db
+opencode-local/bin/
+argo-agent-*/

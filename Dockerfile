@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-ARG LLAMA_CPP_COMMIT=bb4caa7540188872173c44d161602d9271386413
+ARG LLAMA_CPP_COMMIT=61dbf49228c8a96b72e40c89d93cb7c003411f8c
 
 FROM ubuntu:24.04 AS build
 
@@ -41,13 +41,14 @@ RUN cmake -S . -B build \
         -DGGML_VULKAN=OFF \
         -DGGML_OPENCL=OFF \
         -DLLAMA_BUILD_TESTS=OFF \
-        -DLLAMA_BUILD_EXAMPLES=ON \
+        -DBUILD_SHARED_LIBS=OFF \
+        -DLLAMA_BUILD_EXAMPLES=OFF \
         -DLLAMA_BUILD_SERVER=ON \
-        -DLLAMA_BUILD_UI=OFF \
+        -DLLAMA_BUILD_UI=ON \
     && cmake --build build --config Release --parallel 2 \
-        --target llama-server llama-cli llama-bench \
+        --target llama-server \
     && mkdir -p /out/bin /out/lib /out/share \
-    && cp build/bin/llama-server build/bin/llama-cli build/bin/llama-bench /out/bin/ \
+    && cp build/bin/llama-server /out/bin/ \
     && find build -type f -name '*.so*' -exec cp -a {} /out/lib/ \; \
     && printf '%s\n' \
         "llama.cpp commit: ${LLAMA_CPP_COMMIT}" \

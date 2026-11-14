@@ -1,172 +1,68 @@
-# Installation
+# Installazione
 
-This guide reproduces the first Argo Forge environment on Ubuntu. Commands use
-portable home-relative paths; choose a different project directory if needed.
+Requisiti: Docker accessibile all'utente senza sudo, Python 3, Bash, modello già
+presente nel percorso fissato. Non scaricare nuovamente il GGUF.
 
-## Tested software and hardware
+L'immagine locale esistente `local/llama-cpp-lfm25:latest` viene riutilizzata.
+Il Dockerfile del repository fissa lo stesso commit dell'immagine verificata:
+`61dbf49228c8a96b72e40c89d93cb7c003411f8c`.
+La directory esterna `/home/sergio/Progetti/llama-cpp-lfm25/` non viene modificata.
 
-- Ubuntu 24.04 LTS
-- Python 3.12 from Ubuntu
-- Docker Engine
-- OpenCode 1.18.21 for Agent Benchmark v2
-- `@opencode-ai/plugin` 1.18.20, pinned by `opencode-local/package-lock.json`
-- llama.cpp commit `bb4caa7540188872173c44d161602d9271386413`
-- Intel Core i3-3240, AVX/F16C, without AVX2/FMA
-
-OpenCode may have newer releases. Version 1.18.21 is the tested reference, not
-a claim that later versions are incompatible.
-
-## 1. Prerequisites
-
-Install Git, Python, Docker, Node.js, and npm using your preferred trusted
-Ubuntu packages or upstream instructions. Confirm:
+Una ricompilazione è facoltativa e costosa; usare un tag separato per non
+sovrascrivere l'immagine esistente:
 
 ```bash
-git --version
-python3 --version
-docker version
-node --version
-npm --version
+docker build -t local/argo-forge-lfm25:rebuild .
 ```
 
-Use a current Node.js release compatible with the engines declared by the
-locked npm dependency tree. Ubuntu's older Node 18 can install the current lock
-with engine warnings, but is not the recommended reproduction environment;
-OpenCode itself executes the TypeScript tool with Bun.
+La build usa due job, `-march=ivybridge`, AVX/F16C abilitati,
+AVX2/FMA/BMI/BMI2 disabilitati, backend GPU disabilitati, server con Web UI.
+Il launcher continua a utilizzare l'immagine locale verificata: il tag separato
+serve a valutare una ricompilazione prima di adottarla esplicitamente nel codice.
 
-Your user must be able to run Docker. Follow Docker's official post-install
-guidance rather than making the daemon or socket world-writable.
+## OpenCode
 
-Install OpenCode using its official instructions and verify the binary:
-
-```bash
-$HOME/.opencode/bin/opencode --version
-```
-
-If OpenCode is elsewhere, set `OPENCODE_BIN` to its executable path when
-running LocalCode.
-
-## 2. Clone Argo Forge
+Versione fissata: **1.18.20**, come la dipendenza del tool compatto.
+Su Ivy Bridge usare la release **linux-x64-baseline**, non la variante AVX2:
 
 ```bash
-mkdir -p "$HOME/Progetti"
-git clone https://github.com/Uraroga/argo-forge.git "$HOME/Progetti/argo-forge"
-cd "$HOME/Progetti/argo-forge"
-```
-
-## 3. Build the CPU-only llama.cpp image
-
-The Dockerfile clones and checks out the exact llama.cpp commit above. Its
-compiler baseline deliberately avoids instructions unavailable on Ivy Bridge:
-
-- `GGML_NATIVE=OFF`
-- AVX and F16C enabled
-- AVX2, FMA, BMI/BMI2, AVX-512, AMX, and GPU backends disabled
-- compiler flags include `-march=ivybridge`, `-mno-avx2`, and `-mno-fma`
-
-Build the runtime tag used by the registry:
-
-```bash
-docker build -t local/argo-forge-llama-server-ivybridge:dev .
-```
-
-The image contains a generic pinned `llama-server` and is used by all current
-registry entries. To verify build
-metadata without loading a model:
-
-```bash
-docker run --rm --entrypoint sh local/argo-forge-llama-server-ivybridge:dev \
-  -c 'cat /usr/local/share/llama-build-info.txt'
-```
-
-## 4. Install the compact OpenCode tool dependency
-
-Dependencies are locked and are not committed as `node_modules`:
-
-```bash
-cd "$HOME/Progetti/argo-forge/opencode-local"
-npm ci
+mkdir -p opencode-local/bin
+curl -fL https://github.com/anomalyco/opencode/releases/download/v1.18.20/opencode-linux-x64-baseline.tar.gz -o /tmp/argo-opencode.tar.gz
+tar -xzf /tmp/argo-opencode.tar.gz -C opencode-local/bin
+opencode-local/bin/opencode --version
+cd opencode-local
+npm ci --ignore-scripts
 cd ..
 ```
 
-The tool source is `opencode-local/tools/shell.ts`. LocalCode points OpenCode
-at this isolated configuration directory and disables default plugins.
-
-## 5. Prepare model storage
-
-Models stay outside Git:
-
-```bash
-mkdir -p "$HOME/llama-cpp-models"
-```
-
-Acquire GGUF weights directly from their publishers and review their licenses.
-Argo Forge does not download weights. Put filenames in this directory exactly
-as declared in `models.json`, or edit the registry to match files you legally
-obtained.
-
-The public registry uses:
-
-```json
-"models_dir": "$HOME/llama-cpp-models"
-```
-
-`localcode.py` expands environment variables and `~`. You can instead point to
-a different registry with `LOCALCODE_REGISTRY=/path/to/models.json`.
-
-## 6. Install the LocalCode command
+`npm ci` richiede Node/npm già installati; non vengono installati pacchetti di
+sistema automaticamente. Binari e node_modules sono ignorati da Git.
+In alternativa impostare `OPENCODE_BIN` al binario baseline già disponibile.
+La prima esecuzione può scaricare dipendenze software del provider; nessuna
+inferenza viene inviata a provider remoti. Non serve login OpenCode.
 
 ```bash
-mkdir -p "$HOME/.local/bin"
-ln -s "$HOME/Progetti/argo-forge/localcode.py" "$HOME/.local/bin/localcode"
+python3 -m unittest discover -s tests -v
+python3 localcode.py dry-run
+python3 localcode.py start
 ```
 
-If the link already exists and you intend to replace that exact link:
+Il container `argo-forge-lfm25` ha un nome distinto dal precedente
+`llama-cpp-lfm25`. Se il precedente è attivo il launcher rifiuta l'avvio;
+fermarlo esplicitamente prima di avviare Argo Forge. Nessun container viene
+rimosso. Una configurazione del container incompatibile causa un errore e
+richiede una decisione manuale, non una ricreazione automatica.
+
+## Smoke test opzionale dell'agente
 
 ```bash
-ln -sfn "$HOME/Progetti/argo-forge/localcode.py" "$HOME/.local/bin/localcode"
+python3 tests/smoke_agent.py
 ```
 
-Ensure `$HOME/.local/bin` is on `PATH`, then validate:
-
-```bash
-localcode --help
-localcode --list
-localcode qwen-coder-q4 --dry-run
-```
-
-The dry run checks the registry and GGUF path but does not load a model.
-It also reports the context, agent steps, output allowance, runtime, workspace,
-and complete Docker command. For example:
-
-```bash
-localcode qwen-coder-q4 --ctx 8192 --steps 48 --output 1024 --dry-run
-```
-
-## 7. First real launch
-
-Run LocalCode from the source repository you want the agent to edit:
-
-```bash
-cd "$HOME/Progetti/my-project"
-localcode qwen-coder-q4
-```
-
-LocalCode loads the model, waits for health, and opens OpenCode with
-`my-project` as its workspace. The first load can take a long time on old CPUs.
-
-Inspect or stop the managed server:
-
-```bash
-localcode --status
-localcode --stop
-```
-
-Only the container named `localcode-llama-server` with the ownership label
-`localcode.managed=true` is removed by `--stop`.
-
-Direct launches use the selected model's registry context plus conservative
-defaults of 24 OpenCode agent steps and 256 output tokens per model turn. The
-interactive selector prompts for all three budgets; pressing Enter keeps each
-displayed default. Larger contexts consume more RAM and prompt-processing
-time, while large step budgets can keep a slow CPU busy for hours.
+Esegue inferenza reale (può richiedere minuti), crea una piccola fixture nel
+repository con un test inizialmente rosso, concede esplicitamente la shell al
+solo task di prova, verifica modifica, integrità del test e risultato verde.
+Controllare anche nell'output che OpenCode abbia chiamato la shell per il test
+post-modifica. La fixture temporanea viene rimossa al termine; il server resta
+attivo finché non si esegue `python3 localcode.py stop`. Non viene incluso nei
+test unitari per evitare carichi CPU involontari.

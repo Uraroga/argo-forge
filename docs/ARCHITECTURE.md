@@ -1,97 +1,38 @@
-# Architecture
+# Architettura
 
-Argo Forge separates model lifecycle management from coding-agent behavior.
-The model is interchangeable; OpenCode remains the stable harness that owns
-the task loop and workspace.
+`localcode.py` contiene una configurazione unica: percorso GGUF, immagine,
+contesto 131072, due thread, uno slot, zero layer GPU, porta host localhost 18080.
+Non esiste un registro di modelli. Docker monta esattamente un GGUF read-only.
+`--jinja` abilita il template chat per il tool calling; `--metrics` espone le
+statistiche. La Web UI è inclusa nell'immagine e condivide API e scheduler.
 
-## Request flow
+Il launcher attende `/health`, tollerando timeout, errori URL, reset di
+connessione e JSON transitori malformati. Recupera il vero ID da `/v1/models`.
+Un avvio concorrente del precedente server noto o di un container che monta lo
+stesso GGUF viene rifiutato. Le operazioni di gestione richiedono l'etichetta
+`localcode.managed=true`; stop non elimina il container.
 
-```text
-localcode
-   │
-   ▼
-models.json
-   │
-   ▼
-Docker llama-server ──► read-only GGUF outside the repository
-   │
-   ▼
-OpenAI-compatible endpoint on 127.0.0.1:8080
-   │
-   ▼
-OpenCode with an in-memory local-only configuration
-   │
-   ▼
-compact shell tool
-   │
-   ▼
-the current working repository
-```
+OpenCode 1.18.20 riceve configurazione generata in memoria, provider consentito
+solo `llama.cpp`, nessun MCP o plugin predefinito e una sola shell compatta.
+Un XDG config home temporaneo separa la configurazione globale. La configurazione
+di progetto è disabilitata per evitare fusioni di provider/plugin; le istruzioni
+AGENTS.md del progetto non sono quindi caricate automaticamente: includere nel
+task le istruzioni necessarie. Workspace e cwd restano il progetto invocante.
+Aggiornamenti automatici, fetch del catalogo e condivisione sono disabilitati.
 
-## LocalCode launcher
+La shell richiede approvazione salvo `--auto-approve`. Può eseguire tutti i
+comandi consentiti all'utente: non fornisce isolamento di sicurezza.
+Le sessioni OpenCode possono contenere codice e output privati: non versionarle.
+Il server non registra prompt su file tramite flag dedicati; i log Docker sono
+ruotati a 10 MB × 2. Non salvare credenziali nel repository.
 
-`localcode.py` reads `models.json`, validates the selected alias and GGUF,
-constructs the Docker command, and manages a container named
-`localcode-llama-server`. Labels record ownership, model alias, context,
-runtime, step budget, and output budget. LocalCode refuses to remove an
-identically named container without its ownership label.
+Il binding localhost e il tunnel SSH proteggono l'accesso dalla LAN. Nessuna
+esposizione Internet è prevista. Come ogni servizio localhost senza login,
+l'accesso resta consentito ai processi locali: usare browser e software fidati.
 
-Only one model is loaded because the reference host has limited memory and
-because deterministic model switching is easier to reason about than multiple
-competing servers. When a different selection is launched, LocalCode replaces
-only its own managed container.
-
-The endpoint is published as `127.0.0.1:8080:8080`; it is not exposed on all
-host interfaces. The single selected GGUF is mounted under `/models` with
-`:ro`. Weights stay in `$HOME/llama-cpp-models`, outside both the repository
-and Docker image.
-
-## Startup and model discovery
-
-Loading can take minutes. During that period llama-server may refuse or reset
-health connections or briefly return incomplete data. LocalCode polls
-`/health`, catches transient URL, timeout, connection, reset, and JSON parsing
-errors, and continues while the managed container is alive. It does not assume
-that a successful `docker run` means the model is ready.
-
-After health becomes `ok`, LocalCode requests `/v1/models`. The returned model
-ID is used to build the OpenCode provider configuration, avoiding assumptions
-about how a runtime names the loaded model.
-
-## OpenCode isolation
-
-The generated OpenCode configuration exists only in process memory through
-`OPENCODE_CONFIG_CONTENT`. It enables the `llama.cpp` provider at the localhost
-endpoint, disables all cloud providers and default plugins, and points
-`OPENCODE_CONFIG_DIR` at `opencode-local`.
-
-The current shell directory is passed to OpenCode as the workspace. Argo Forge
-does not add `.opencode` files to repositories visited by the user.
-
-OpenCode remains the only agent-loop engine. LocalCode merely configures its
-maximum step count: `--steps` is the number of agentic iterations, `--output`
-is the model allowance for one turn, and `--ctx` is the available context.
-These limits are independent; reaching the step ceiling does not establish
-that the context was exhausted.
-
-## Why one compact tool
-
-OpenCode's broad default toolset is useful with large cloud contexts but its
-schemas and agent instructions consume prompt tokens. At context 2048, that
-overhead can crowd out the task and source code. On the Ivy Bridge host,
-processing the tool-aware prompt can also dominate wall time before generation
-begins.
-
-Argo Forge disables every default tool and exposes one compact `shell` tool
-with one string argument. It runs Bash in the active workspace and returns
-stdout, stderr, and the exit code. This gives the model enough capability to
-inspect, edit, compile, and test while keeping the schema small.
-
-The tool labels those three result sections explicitly and encourages batching
-related shell operations. Commands such as `grep`, `find`, `sed`, `cat`,
-`git diff`, compilers, and tests supply the text-only model's observations
-without adding a broad tool schema or vision infrastructure.
-
-This is an engineering tradeoff, not a sandbox boundary. The tool executes as
-the current user. Run untrusted models and tasks only in an appropriately
-isolated environment.
+Il template del GGUF apre `<think>` per impostazione predefinita. Le richieste
+OpenCode impostano `reasoning_budget: 0` per dedicare il piccolo budget di output
+a tool e risposte; la Web UI conserva le proprie impostazioni di ragionamento.
+Questa opzione non modifica il contesto o il container. Il passaggio di opzioni
+personalizzate usa il provider [OpenAI Compatible di AI SDK](https://ai-sdk.dev/providers/openai-compatible-providers)
+e la trasformazione verificata nel [codice OpenCode 1.18.20](https://github.com/anomalyco/opencode/blob/v1.18.20/packages/opencode/src/provider/transform.ts).
