@@ -1,3 +1,37 @@
+# Preparazione pubblica — aggiornamento del 15 novembre 2026
+
+Il resoconto del 14 novembre riportato sotto è storico: il suo stato finale
+«container fermi» non descrive lo stato corrente dei servizi. Successivamente
+il deployment di riferimento è stato avviato con --timeout 21600 e collegato a
+Hermes; i dati operativi di migrazione rimangono nei rapporti locali esclusi.
+
+La preparazione pubblica preserva 21600 s server e 21600000 ms client, contesto
+131072, due thread CPU, uno slot e bind localhost. Aggiunge verifiche mock sul
+rifiuto delle configurazioni incompatibili e verifiche di distribuzione senza
+build, installazioni, inferenza, manutenzione o modifica di Hermes.
+
+I controlli automatici attuali si riproducono con:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest discover -s tests -v
+python3 -B tools/audit_distribution.py
+```
+
+Esito della preparazione del 15 novembre: **32/32 test automatici riusciti**.
+L'audit ha verificato **23 file pubblicabili** e il contesto Docker composto
+soltanto da **.dockerignore e Dockerfile**, senza leggere archivi riservati.
+Questi numeri descrivono il set di file e test di questa revisione; l'audit
+ristampa l'elenco corrente per la revisione successiva.
+
+Il loro esito riguarda configurazione, isolamento dei materiali e comportamento
+simulato del launcher. Non rinnova la readiness completa OpenCode del test
+storico e non è un collaudo continuo di sei ore. Il test smoke opt-in conserva
+900 s e il tool Bash non riceve un nuovo timeout implicito. Semantica e limiti
+in [TIMEOUTS.md](TIMEOUTS.md); selezione dei file in
+[PUBLICATION.md](PUBLICATION.md).
+
+---
+
 # Verifica locale — 14 novembre 2026
 
 Verifica esplorativa su argo3, non benchmark comparativo.

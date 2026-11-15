@@ -6,7 +6,10 @@ presente nel percorso fissato. Non scaricare nuovamente il GGUF.
 L'immagine locale esistente `local/llama-cpp-lfm25:latest` viene riutilizzata.
 Il Dockerfile del repository fissa lo stesso commit dell'immagine verificata:
 `61dbf49228c8a96b72e40c89d93cb7c003411f8c`.
-La directory esterna `/home/sergio/Progetti/llama-cpp-lfm25/` non viene modificata.
+Il progetto llama.cpp autonomo preesistente, esterno a questo repository, non viene modificato.
+Il percorso `MODEL` nel launcher è quello del deployment di riferimento: su un
+altro host adattare solo il percorso al medesimo GGUF prima del primo avvio.
+Non sono previsti ricerca automatica di modelli o fallback.
 
 Una ricompilazione è facoltativa e costosa; usare un tag separato per non
 sovrascrivere l'immagine esistente:
@@ -42,7 +45,8 @@ La prima esecuzione può scaricare dipendenze software del provider; nessuna
 inferenza viene inviata a provider remoti. Non serve login OpenCode.
 
 ```bash
-python3 -m unittest discover -s tests -v
+PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest discover -s tests -v
+python3 -B tools/audit_distribution.py
 python3 localcode.py dry-run
 python3 localcode.py start
 ```
@@ -62,7 +66,42 @@ python3 tests/smoke_agent.py
 Esegue inferenza reale (può richiedere minuti), crea una piccola fixture nel
 repository con un test inizialmente rosso, concede esplicitamente la shell al
 solo task di prova, verifica modifica, integrità del test e risultato verde.
+Il sottoprocesso OpenCode di questo smoke test conserva il limite di **900 secondi**;
+non è una prova di durata sei ore. Non eseguirlo durante conversazioni importanti.
 Controllare anche nell'output che OpenCode abbia chiamato la shell per il test
 post-modifica. La fixture temporanea viene rimossa al termine; il server resta
 attivo finché non si esegue `python3 localcode.py stop`. Non viene incluso nei
 test unitari per evitare carichi CPU involontari.
+
+## Aggiornare il codice senza modificare i servizi
+
+Per revisionare i timeout già applicati bastano test mock, audit e diff. Non
+servono build, inferenze o riavvii. I pin di llama.cpp e OpenCode restano quelli
+indicati sopra; le dipendenze Python dei controlli sono solo libreria standard.
+Non si promette una build identica bit per bit: pacchetti di sistema e base image
+possono evolvere, mentre commit, opzioni CPU e versione OpenCode sono espliciti.
+
+Il contesto locale del comando `docker build -f Dockerfile .` è limitato a
+Dockerfile e .dockerignore; il sorgente llama.cpp è acquisito nello stage build.
+Una build resta un'operazione separata, con rete e costo CPU, non eseguita dai
+controlli di preparazione. Conservare l'immagine funzionante e usare un tag distinto
+se si decide esplicitamente di provarne un'altra.
+
+## Migrare un container precedente: manutenzione separata
+
+`docker restart` mantiene gli argomenti originali: non aggiunge --timeout.
+Se il Cmd del container non coincide con il launcher aggiornato, start/restart
+rifiutano la configurazione e non fermano o sostituiscono automaticamente nulla.
+Non aggirare il controllo con cancellazioni o avviando un secondo modello.
+
+Un'eventuale migrazione va pianificata quando non ci sono inferenze, messaggi
+Hermes in lavorazione o lavori accodati: registrare configurazione e volumi,
+eseguire backup protetti, fermare i consumer secondo la loro procedura e conservare
+il server precedente fermo come rollback. Solo in manutenzione autorizzata si
+può avviare un singolo server con gli argomenti nuovi e riagganciare i consumer
+al namespace attuale, mantenendo i dati. Verificare API, UI e consumer prima di
+riprendere le lezioni. Non avviare contemporaneamente server attuale e rollback.
+
+Questo progetto non esegue tali operazioni automaticamente. Il deployment di
+riferimento ha già --timeout 21600 e non richiede una nuova migrazione per la
+pubblicazione dei file. Vedere [TIMEOUTS.md](TIMEOUTS.md).

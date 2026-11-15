@@ -1,0 +1,25 @@
+# Elenco esplicito dei file pubblicabili. Non esegue staging o pubblicazione.
+# .env.example è ammesso solo se presente e con valori vuoti o REPLACE_ME.
+.dockerignore
+.gitignore
+AGENTS.md
+Dockerfile
+LICENSE
+README.md
+assets/Mascotte_IA_LFM2_5_Intel_i3-3240.png
+distribution-files.txt
+docs/ARCHITECTURE.md
+docs/INSTALLATION.md
+docs/PUBLICATION.md
+docs/TIMEOUTS.md
+docs/TROUBLESHOOTING.md
+docs/VALIDATION.md
+localcode.py
+opencode-local/.gitignore
+opencode-local/package-lock.json
+opencode-local/package.json
+opencode-local/tools/shell.ts
+tests/smoke_agent.py
+tests/test_distribution.py
+tests/test_localcode.py
+tools/audit_distribution.py

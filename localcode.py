@@ -19,6 +19,8 @@ IMAGE = 'local/llama-cpp-lfm25:latest'
 CONTAINER = 'argo-forge-lfm25'
 BASE_URL = 'http://127.0.0.1:18080'
 CONTEXT = 131072
+REQUEST_TIMEOUT_SECONDS = 21600
+REQUEST_TIMEOUT_MS = REQUEST_TIMEOUT_SECONDS * 1000
 OPENCODE_DIR = ROOT / 'opencode-local'
 
 class LocalCodeError(Exception):
@@ -56,7 +58,7 @@ def server_command():
             IMAGE, '--model', '/models/lfm25.gguf', '--host', '0.0.0.0',
             '--port', '8080', '--threads', '2', '--threads-batch', '2',
             '--ctx-size', str(CONTEXT), '--parallel', '1', '--n-gpu-layers', '0',
-            '--jinja', '--metrics']
+            '--jinja', '--metrics', '--timeout', str(REQUEST_TIMEOUT_SECONDS)]
 
 def managed():
     state = inspect()
@@ -107,7 +109,7 @@ def opencode_config(model_id, steps, output, auto_approve=False):
         "provider": {"llama.cpp": {
             "npm": "@ai-sdk/openai-compatible",
             "name": "LFM2.5 local",
-            "options": {"baseURL": f"{BASE_URL}/v1", "headerTimeout": False, "timeout": False},
+            "options": {"baseURL": f"{BASE_URL}/v1", "headerTimeout": REQUEST_TIMEOUT_MS, "timeout": REQUEST_TIMEOUT_MS, "chunkTimeout": REQUEST_TIMEOUT_MS},
             "models": {model_id: {"name": "LFM2.5-24B-A2B Q4_K_M", "options": {"reasoning_budget": 0}, "limit": {"context": CONTEXT, "output": output}}},
         }},
         "agent": {

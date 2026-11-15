@@ -1,14 +1,6 @@
-.git
-.github
-docs
-logs
-node_modules
-**/node_modules
-__pycache__
-*.py[cod]
-*.gguf
-*.safetensors
-*.tar
-*.tar.gz
-*.zip
-.env*
+# Il Dockerfile non usa COPY/ADD di sorgenti locali: solo COPY --from=build.
+# Escludi tutto, inclusi backup, segreti, rapporti, modelli e dipendenze.
+# Ogni ampliamento richiede revisione e aggiornamento dell'audit.
+**
+!Dockerfile
+!.dockerignore
