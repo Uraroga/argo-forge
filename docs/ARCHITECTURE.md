@@ -26,9 +26,15 @@ Le sessioni OpenCode possono contenere codice e output privati: non versionarle.
 Il server non registra prompt su file tramite flag dedicati; i log Docker sono
 ruotati a 10 MB × 2. Non salvare credenziali nel repository.
 
-Il binding localhost e il tunnel SSH proteggono l'accesso dalla LAN. Nessuna
-esposizione Internet è prevista. Come ogni servizio localhost senza login,
-l'accesso resta consentito ai processi locali: usare browser e software fidati.
+Docker pubblica il server su `127.0.0.1:18080` per i client locali.
+L'operatore può aggiungere un binding su un IPv4 privato configurando
+`ARGO_FORGE_LAN_IP` e `ARGO_FORGE_LAN_FIREWALL_UNIT`. Per creare o avviare
+un container con binding LAN, il launcher richiede che l'unità systemd
+indicata sia attiva. Le regole di filtraggio sono gestite dall'operatore.
+La modalità LAN omette il riavvio automatico di Docker per passare dal
+controllo del firewall a ogni avvio tramite il launcher.
+L'API usa HTTP senza credenziali applicative. La configurazione OpenCode
+resta effimera.
 
 Il template del GGUF apre `<think>` per impostazione predefinita. Le richieste
 OpenCode impostano `reasoning_budget: 0` per dedicare il piccolo budget di output

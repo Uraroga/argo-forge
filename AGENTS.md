@@ -10,7 +10,9 @@ AVX/F16C compatibility without AVX2/FMA/BMI2 assumptions.
 Use the existing local image and preserve the external standalone project.
 Do not delete existing containers/images without confirmation. The launcher
 must never automatically remove containers; manage only its named container
-with `localcode.managed=true`. Bind only 127.0.0.1; LAN access uses SSH tunneling.
+with `localcode.managed=true`. Publish port 18080 on loopback by default. A private LAN binding is opt-in
+through ARGO_FORGE_LAN_IP and requires an active firewall service configured
+via ARGO_FORGE_LAN_FIREWALL_UNIT.
 Never read/modify/publish ~/.codex, download model weights, save credentials,
 commit logs or sessions, use sudo or push without explicit authorization.
 

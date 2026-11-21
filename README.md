@@ -63,17 +63,22 @@ Il tool può leggere, modificare, compilare e testare tramite Bash.
 
 ## Accesso LAN
 
-Il binding resta esclusivamente localhost. Da un altro computer della LAN,
-con accesso SSH già configurato tramite chiave:
+Il launcher pubblica la porta 18080 solo sul loopback per impostazione predefinita.
+Per l'accesso diretto da una LAN fidata, impostare `ARGO_FORGE_LAN_IP` con
+l'IPv4 privata dell'host e `ARGO_FORGE_LAN_FIREWALL_UNIT` con il nome
+dell'unità systemd che filtra gli ingressi prima dell'inoltro Docker.
+Configurare il firewall affinché consenta soltanto la sottorete desiderata
+e mantenere entrambi i valori per i comandi di gestione successivi. Il
+launcher verifica che l'unità sia attiva prima dell'avvio e del riavvio.
+La modalità LAN omette il riavvio automatico di Docker per passare dal
+controllo del firewall a ogni avvio tramite il launcher.
+Un container con binding differenti richiede un intervento esplicito
+dell'operatore.
 
-```bash
-ssh -N -L 127.0.0.1:18080:127.0.0.1:18080 utente@server
-```
-
-Aprire `http://127.0.0.1:18080` su quel computer. Non sono necessari password
-applicative o credenziali nel repository. Non configurare port forwarding sul
-router né pubblicare la porta Docker su `0.0.0.0`. API e Web UI condividono lo
-stesso modello e uno slot: richieste simultanee possono attendere in coda.
+Dal browser usare `http://IP_LAN:18080/`, con API in
+`http://IP_LAN:18080/v1`. Il servizio usa HTTP senza autenticazione
+applicativa. Evitare il port forwarding sul router. API e Web UI condividono
+lo stesso modello e uno slot, quindi le richieste simultanee possono attendere.
 
 ## Documentazione
 

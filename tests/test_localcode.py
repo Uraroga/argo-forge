@@ -27,8 +27,33 @@ class SafetyTests(unittest.TestCase):
             'Config': {'Cmd': command[command.index(m.IMAGE)+1:], 'Labels': {'localcode.managed': 'true'}},
             'State': {'Running': running}, 'Image': 'sha256:fixture',
             'Mounts': [{'Source': str(m.MODEL), 'Destination': '/models/lfm25.gguf', 'RW': False}],
-            'HostConfig': {'PortBindings': {'8080/tcp': [{'HostIp': '127.0.0.1', 'HostPort': '18080'}]}},
+            'HostConfig': {'PortBindings': {'8080/tcp': [
+                {'HostIp': '127.0.0.1', 'HostPort': '18080'},
+            ]}},
         }
+
+    def test_lan_opt_in_requires_active_firewall(self):
+        env = {'ARGO_FORGE_LAN_IP': '10.20.30.40',
+               'ARGO_FORGE_LAN_FIREWALL_UNIT': 'my-firewall.service'}
+        with patch.dict(m.os.environ, env), patch.object(m.subprocess, 'run') as run:
+            cmd = m.server_command()
+            self.assertIn('10.20.30.40:18080:8080', cmd)
+            self.assertNotIn('--restart', cmd)
+            run.return_value.returncode = 1
+            with self.assertRaises(m.LocalCodeError):
+                m.require_lan_firewall()
+            run.assert_called_once_with(
+                ['systemctl', 'is-active', '--quiet', '--', 'my-firewall.service'],
+                check=False,
+            )
+            run.return_value.returncode = 0
+            m.require_lan_firewall()
+
+    def test_lan_rejects_wildcard_and_public_bindings(self):
+        for address in ('0.0.0.0', '203.0.113.1', '127.0.0.1'):
+            with self.subTest(address=address), patch.dict(m.os.environ, {'ARGO_FORGE_LAN_IP': address}):
+                with self.assertRaises(m.LocalCodeError):
+                    m.server_command()
 
     def test_timeout_units(self):
         self.assertIs(type(m.REQUEST_TIMEOUT_SECONDS), int)
@@ -39,11 +64,15 @@ class SafetyTests(unittest.TestCase):
 
     def test_fixed_server_contract(self):
         cmd = m.server_command()
-        for flag, value in {'--ctx-size': '131072', '-p': '127.0.0.1:18080:8080',
+        for flag, value in {'--ctx-size': '131072', '--restart': 'unless-stopped',
                             '--n-gpu-layers': '0', '--parallel': '1', '--threads': '2',
                             '--threads-batch': '2', '--timeout': '21600'}.items():
             self.assertEqual(cmd.count(flag), 1)
             self.assertEqual(cmd[cmd.index(flag)+1], value)
+        self.assertEqual(
+            [cmd[index + 1] for index, arg in enumerate(cmd) if arg == '-p'],
+            ['127.0.0.1:18080:8080'],
+        )
         self.assertIn('readonly', cmd[cmd.index('--mount')+1])
         self.assertIn('--jinja', cmd)
         self.assertIn('--metrics', cmd)

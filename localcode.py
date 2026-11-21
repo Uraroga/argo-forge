@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """One CPU-only LFM2.5 server shared by llama.cpp Web UI and OpenCode."""
 import argparse
+import ipaddress
 import json
 import os
 from pathlib import Path
@@ -18,6 +19,8 @@ MODEL = Path('/home/sergio/llama-cpp-models/LFM2.5-24B-A2B-Q4_K_M.gguf')
 IMAGE = 'local/llama-cpp-lfm25:latest'
 CONTAINER = 'argo-forge-lfm25'
 BASE_URL = 'http://127.0.0.1:18080'
+HOST_PORT = '18080'
+CONTAINER_PORT = '8080'
 CONTEXT = 131072
 REQUEST_TIMEOUT_SECONDS = 21600
 REQUEST_TIMEOUT_MS = REQUEST_TIMEOUT_SECONDS * 1000
@@ -49,11 +52,40 @@ def docker_inspect(fmt):
     result = subprocess.run(['docker', 'inspect', '--format', fmt, CONTAINER], capture_output=True, text=True)
     return result.stdout.strip() if result.returncode == 0 else None
 
+def host_bindings():
+    address = os.getenv('ARGO_FORGE_LAN_IP')
+    if not address:
+        return ('127.0.0.1',)
+    try:
+        ip = ipaddress.IPv4Address(address)
+    except ipaddress.AddressValueError as exc:
+        raise LocalCodeError('ARGO_FORGE_LAN_IP must be a private IPv4 address') from exc
+    private_networks = ('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16')
+    if not any(ip in ipaddress.IPv4Network(network) for network in private_networks):
+        raise LocalCodeError('ARGO_FORGE_LAN_IP must be a private IPv4 address')
+    return ('127.0.0.1', str(ip))
+
+
+def require_lan_firewall():
+    if len(host_bindings()) == 1:
+        return
+    service = os.getenv('ARGO_FORGE_LAN_FIREWALL_UNIT')
+    if not service or not service.endswith('.service') or service.startswith('-'):
+        raise LocalCodeError('Set ARGO_FORGE_LAN_FIREWALL_UNIT to the LAN firewall service')
+    guard = subprocess.run(['systemctl', 'is-active', '--quiet', '--', service], check=False)
+    if guard.returncode:
+        raise LocalCodeError('LAN firewall is inactive; refusing to expose the API')
+
+
 def server_command():
+    addresses = host_bindings()
+    publish = [arg for address in addresses
+               for arg in ('-p', f'{address}:{HOST_PORT}:{CONTAINER_PORT}')]
+    restart = ['--restart', 'unless-stopped'] if len(addresses) == 1 else []
     return ['docker', 'run', '-d', '--init', '--name', CONTAINER,
-            '--label', 'localcode.managed=true',
+            '--label', 'localcode.managed=true', *restart,
             '--log-opt', 'max-size=10m', '--log-opt', 'max-file=2',
-            '-p', '127.0.0.1:18080:8080', '--mount',
+            *publish, '--mount',
             f'type=bind,source={MODEL},target=/models/lfm25.gguf,readonly',
             IMAGE, '--model', '/models/lfm25.gguf', '--host', '0.0.0.0',
             '--port', '8080', '--threads', '2', '--threads-batch', '2',
@@ -73,7 +105,12 @@ def validate(state):
     mounts = state['Mounts']
     if len(mounts) != 1 or mounts[0]['Source'] != str(MODEL) or mounts[0]['Destination'] != '/models/lfm25.gguf' or mounts[0]['RW']:
         raise LocalCodeError('Invalid model mount; leaving container untouched')
-    if state['HostConfig']['PortBindings'] != {'8080/tcp': [{'HostIp': '127.0.0.1', 'HostPort': '18080'}]}:
+    bindings = state['HostConfig']['PortBindings'] or {}
+    expected_port = f'{CONTAINER_PORT}/tcp'
+    actual = sorted((entry['HostIp'], entry['HostPort'])
+                    for entry in bindings.get(expected_port, []))
+    expected_bindings = sorted((address, HOST_PORT) for address in host_bindings())
+    if set(bindings) != {expected_port} or actual != expected_bindings:
         raise LocalCodeError('Unsafe port binding; leaving container untouched')
     image_id = subprocess.check_output(['docker', 'image', 'inspect', IMAGE, '--format', '{{.Id}}'], text=True).strip()
     if state['Image'] != image_id:
@@ -92,8 +129,10 @@ def ensure_server():
     if state:
         validate(state)
         if not state['State']['Running']:
+            require_lan_firewall()
             subprocess.run(['docker', 'start', CONTAINER], check=True)
     else:
+        require_lan_firewall()
         if not MODEL.is_file() or not os.access(MODEL, os.R_OK):
             raise LocalCodeError(f'GGUF unreadable: {MODEL}')
         subprocess.run(['docker', 'image', 'inspect', IMAGE], check=True, stdout=subprocess.DEVNULL)
@@ -206,6 +245,7 @@ def main():
         if args.command == 'stop':
             return subprocess.run(['docker', 'stop', CONTAINER]).returncode
         validate(state)
+        require_lan_firewall()
         subprocess.run(['docker', 'stop', CONTAINER], check=True)
     if args.command == 'stats':
         print(endpoint('/metrics', timeout=10)); return 0
